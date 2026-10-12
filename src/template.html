@@ -6,7 +6,8 @@
 <title>Расписание</title>
 <style>
 :root{--bg:#fff;--ink:#111;--mute:#999;--line:#d9d9d9;--hl:#edeff5;--hl2:#e3e7f3;--ac:#3b5bdb;
-  --sans:"Inter","Segoe UI",system-ui,Roboto,Helvetica,Arial,sans-serif}
+  --sans:"Inter","Segoe UI",system-ui,Roboto,Helvetica,Arial,sans-serif;
+  --radius:3px;--row-gap:.4em;--col-gap:.7em}
 @property --rows{syntax:"<number>";inherits:false;initial-value:1}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);overflow:hidden}
@@ -16,26 +17,26 @@ h1{margin:0;font-weight:600;font-size:1.7em;letter-spacing:-.03em}
 h1 span{font-weight:400;color:var(--mute);margin-left:.6em;font-size:.55em;letter-spacing:0}
 #clock{font-weight:500;font-size:1.2em;font-variant-numeric:tabular-nums;color:var(--mute)}
 #wrap{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:1.6vh}
-.sec{flex:var(--rows,1) 1 0;min-height:0;display:grid;column-gap:.7em;row-gap:.4em;
+.sec{flex:var(--rows,1) 1 0;min-height:0;display:grid;column-gap:var(--col-gap);row-gap:var(--row-gap);
   border-top:2px solid var(--ink);padding-top:1em}
-.h{padding:.45em .6em;font-weight:600;font-size:.75em;letter-spacing:.08em;text-transform:uppercase;
-  color:#fff;background:var(--ac);border-radius:3px;text-align:center}
+.h{padding:var(--gy,.7em) var(--gx,.6em);font-weight:600;font-size:var(--gf,1em);letter-spacing:.08em;text-transform:uppercase;
+  color:#fff;background:var(--ac);border-radius:var(--radius);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .h.blank{background:none}
-.n{display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:1.05em;
-  color:#fff;background:var(--ac);border-radius:3px;line-height:1.1}
-.n small{font-size:.48em;font-weight:500;font-variant-numeric:tabular-nums;opacity:.85}
-.c{padding:.4em .65em;min-width:0;min-height:0;display:flex;flex-direction:column;justify-content:center;
-  overflow:hidden;background:var(--hl);border-radius:3px;border:1px solid var(--line)}
+.n{display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:var(--pf,1.05em);
+  color:#fff;background:var(--ac);border-radius:var(--radius);line-height:1.1}
+.n small{font-size:var(--ptf,.48em);font-weight:500;font-variant-numeric:tabular-nums;opacity:.85}
+.c{padding:var(--ly,.4em) var(--lx,.65em);min-width:0;min-height:0;display:flex;flex-direction:column;justify-content:center;
+  overflow:hidden;background:var(--hl);border-radius:var(--radius);border:1px solid var(--line)}
 .c.grp1{background:var(--hl2)}
 .c.e .s{color:var(--mute);font-weight:400;font-style:italic}
 .b{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:.8em;
-  padding:.12em .6em;font-size:.68em;color:var(--mute);
-  border:1px dashed var(--line);border-radius:3px;white-space:nowrap;overflow:hidden}
+  padding:var(--by,.12em) .6em;font-size:var(--bf,.68em);color:var(--mute);
+  border:1px dashed var(--line);border-radius:var(--radius);white-space:nowrap;overflow:hidden}
 .b b{font-weight:600;letter-spacing:.06em;text-transform:uppercase}
 .b span{font-variant-numeric:tabular-nums}
-.s{font-weight:500;line-height:1.15;overflow-wrap:anywhere}
-.r{color:var(--ac);font-size:.78em;font-weight:600;margin-top:.15em}
-.t{color:var(--mute);font-size:.7em}
+.s{font-weight:500;font-size:var(--lf,1em);line-height:1.15;overflow-wrap:anywhere}
+.r{color:var(--ac);font-size:var(--rf,.78em);font-weight:600;margin-top:.15em}
+.t{color:var(--mute);font-size:var(--tf,.7em)}
 .c.now{border-color:var(--ac);background:#edf0fd}
 .b.now{color:var(--ac);border-color:var(--ac);border-style:solid;background:#edf0fd}
 .past{opacity:var(--dim,.4)}
@@ -53,10 +54,51 @@ h1 span{font-weight:400;color:var(--mute);margin-left:.6em;font-size:.55em;lette
 </div>
 <script>
 __CONFIG__
+</script>
+<script>
 const DAY = __DATA__;
+const DEF = {
+  testTime:null, refreshSeconds:20,
+  showBreaks:true, showPairTimes:true, showClock:true, showNoLesson:true,
+  highlightCurrent:true, dimPast:true, dimOpacity:0.4,
+  groupFont:1.0, groupPadY:0.7, groupPadX:0.6,
+  pairFont:1.05, pairTimeFont:0.48,
+  lessonFont:1.0, roomFont:0.78, teacherFont:0.7, lessonPadY:0.4, lessonPadX:0.65,
+  breakFont:0.68, breakPadY:0.12,
+  rowGap:0.4, colGap:0.7, radius:3,
+  bells:{}, bellDays:{}
+};
+const num = (v, d) => (typeof v === 'number' && isFinite(v) && v >= 0) ? v : d;
+const bool = (v, d) => (typeof v === 'boolean') ? v : d;
+const USER = (typeof window.USERCFG !== 'undefined' && window.USERCFG) || {};
+const CONFIG = Object.assign({}, DEF, USER);
+CONFIG.testTime = (typeof CONFIG.testTime === 'string' && /^\d{1,2}:\d{2}$/.test(CONFIG.testTime)) ? CONFIG.testTime : null;
+CONFIG.refreshSeconds = num(CONFIG.refreshSeconds, 20) || 20;
+['showBreaks','showPairTimes','showClock','showNoLesson','highlightCurrent','dimPast'].forEach(k => CONFIG[k] = bool(CONFIG[k], true));
+CONFIG.dimOpacity = (typeof CONFIG.dimOpacity === 'number' && CONFIG.dimOpacity >= 0 && CONFIG.dimOpacity <= 1) ? CONFIG.dimOpacity : 0.4;
+['groupFont','groupPadY','groupPadX','pairFont','pairTimeFont','lessonFont','roomFont','teacherFont',
+ 'lessonPadY','lessonPadX','breakFont','breakPadY','rowGap','colGap','radius'].forEach(k => CONFIG[k] = num(CONFIG[k], DEF[k]));
+if (!CONFIG.bells || typeof CONFIG.bells !== 'object') CONFIG.bells = {};
+if (!CONFIG.bellDays || typeof CONFIG.bellDays !== 'object') CONFIG.bellDays = {};
 const wrap = document.getElementById('wrap');
 const app = document.querySelector('#app');
-document.documentElement.style.setProperty('--dim', CONFIG.dimOpacity);
+const root = document.documentElement.style;
+root.setProperty('--dim', CONFIG.dimOpacity);
+root.setProperty('--radius', CONFIG.radius + 'px');
+root.setProperty('--row-gap', CONFIG.rowGap + 'em');
+root.setProperty('--col-gap', CONFIG.colGap + 'em');
+root.setProperty('--gf', CONFIG.groupFont + 'em');
+root.setProperty('--gy', CONFIG.groupPadY + 'em');
+root.setProperty('--gx', CONFIG.groupPadX + 'em');
+root.setProperty('--pf', CONFIG.pairFont + 'em');
+root.setProperty('--ptf', CONFIG.pairTimeFont + 'em');
+root.setProperty('--lf', CONFIG.lessonFont + 'em');
+root.setProperty('--rf', CONFIG.roomFont + 'em');
+root.setProperty('--tf', CONFIG.teacherFont + 'em');
+root.setProperty('--ly', CONFIG.lessonPadY + 'em');
+root.setProperty('--lx', CONFIG.lessonPadX + 'em');
+root.setProperty('--bf', CONFIG.breakFont + 'em');
+root.setProperty('--by', CONFIG.breakPadY + 'em');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const d = new Date(DAY.date + 'T00:00:00');
 const wd = d.toLocaleDateString('ru-RU', {weekday:'long'});

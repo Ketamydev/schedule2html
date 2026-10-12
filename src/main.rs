@@ -102,6 +102,7 @@ fn run() -> Res<()> {
     let mut written: Vec<PathBuf> = Vec::new();
     let mut failed = 0usize;
     let total = files.len();
+    let config = load_config(!opts.quiet)?;
     for (i, input) in files.iter().enumerate() {
         let day = match parse_docx(input) {
             Ok(d) if !d.sections.is_empty() => d,
@@ -128,7 +129,7 @@ fn run() -> Res<()> {
         let json = serde_json::to_string(&day)?.replace("</", "<\\/");
         let html = TEMPLATE
             .replace("__DATA__", &json)
-            .replace("__CONFIG__", &load_config()?);
+            .replace("__CONFIG__", &config);
         fs::write(&target, html)?;
         if !opts.quiet {
             eprintln!(
@@ -244,10 +245,23 @@ fn is_docx(p: &Path) -> bool {
         .is_some_and(|e| e.eq_ignore_ascii_case("docx"))
 }
 
-fn load_config() -> Res<String> {
+fn load_config(verbose: bool) -> Res<String> {
     let external = exe_path()?.join("config.js");
     if external.exists() {
-        return Ok(fs::read_to_string(external)?);
+        let raw = fs::read(&external)?;
+        let text = String::from_utf8(raw)
+            .map_err(|_| format!("{}: файл должен быть в кодировке UTF-8", external.display()))?;
+        if !text.contains("USERCFG") {
+            return Err(format!("{}: не найден объект USERCFG", external.display()).into());
+        }
+        return Ok(text);
+    }
+    fs::write(&external, DEFAULT_CONFIG)?;
+    if verbose {
+        eprintln!(
+            "Создан {} — настройки страницы меняются в нём",
+            external.display()
+        );
     }
     Ok(DEFAULT_CONFIG.to_string())
 }
@@ -351,7 +365,9 @@ fn parse_docx(path: &Path) -> Res<Day> {
         for tr in tbl.children().filter(|n| name(*n, "tr")) {
             rows_seen += 1;
             if rows_seen > MAX_ROWS {
-                return Err(format!("слишком много строк в таблице (>{MAX_ROWS}) — пропускаю").into());
+                return Err(
+                    format!("слишком много строк в таблице (>{MAX_ROWS}) — пропускаю").into(),
+                );
             }
             let (mut cells, merges) = row_cells(tr, &keep);
             if cells.is_empty() {
@@ -381,11 +397,15 @@ fn parse_docx(path: &Path) -> Res<Day> {
             let first = norm(&cells[0]);
             if let Ok(n) = first.parse::<u32>() {
                 if n > MAX_PAIR {
-                    return Err(format!("номер пары {n} больше лимита {MAX_PAIR} — пропускаю").into());
+                    return Err(
+                        format!("номер пары {n} больше лимита {MAX_PAIR} — пропускаю").into(),
+                    );
                 }
                 if let Some(s) = cur.as_mut() {
                     if s.groups.len() > MAX_GROUPS {
-                        return Err(format!("слишком много групп (>{MAX_GROUPS}) — пропускаю").into());
+                        return Err(
+                            format!("слишком много групп (>{MAX_GROUPS}) — пропускаю").into()
+                        );
                     }
                     let lessons = (0..s.groups.len())
                         .map(|i| cells.get(i + 1).and_then(|c| parse_lesson(c)))
